@@ -1,0 +1,6 @@
+SCRIPT TASKS
+1. read excel file
+2. filter out DDS devices (Device Type, column D = GVOP)
+3. create devices (1x per GUID, use name (column C) and IP addresses (IP A = column E==A + column K, IP B = column E==B + column K)).  Assume link speed is 25GB (25000).  Set number of sources and dests (read numbers of spigots from Source and Dest ports pages per device)
+4. create source spigots for the device (use source flows page for data, type = column F, mcast = column J, unicast = column K, src port = column M, dest port = column L, flow_id = column G, caps should be set via flow type)
+5. create dest spigots (no export of dest flows, we know how many spigots to create based on info in #3, we should assume that the dest spigot config matches the source spigots eg number of flows per spigot etc)
