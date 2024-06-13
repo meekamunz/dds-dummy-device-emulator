@@ -1,4 +1,44 @@
-Opening file: C:/Sandbox/dds-dummy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
 Data loaded successfully.
 Creating XML file...
-Failed to create XML file: 'Interface'
+XML file created successfully.
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Data loaded successfully.
+Creating XML file...
+Failed to create XML file: 'SpigotIndex'
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Data loaded successfully.
+Creating XML file...
+XML file created successfully.
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Data loaded successfully.
+Creating XML file...
+XML file created successfully.
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Data loaded successfully.
+Creating XML file...
+XML file created successfully.
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Data loaded successfully.
+Creating XML file...
+XML file created successfully.
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Data loaded successfully.
+Creating XML file...
+Failed to create XML file: name 'count_flows' is not defined
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Data loaded successfully.
+Creating XML file...
+XML file created successfully.
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Data loaded successfully.
+Creating XML file...
+XML file created successfully.
+Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+Data loaded successfully.
+Creating XML file...
+XML file created successfully.
+2024-06-13 23:27:33,159 - root - INFO - Opening file: C:/Users/meeka/source/repos/meekamunz/dds-dumy-device-emulator/examples/export-spreadsheets/export-dds-20240613.xlsx
+2024-06-13 23:27:33,350 - root - INFO - Data loaded successfully.
+2024-06-13 23:27:33,350 - root - INFO - Creating XML file...
+2024-06-13 23:27:33,384 - root - INFO - XML file created successfully.

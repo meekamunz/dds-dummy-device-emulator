@@ -9,13 +9,14 @@ from logger_config import configure_logging  # Import configure_logging function
 df_device_names = None
 df_source_ports = None
 df_destination_ports = None
+df_source_flows = None
 extracted_data = []
 
 # Configure logging
 configure_logging()
 
 def open_file():
-    global df_device_names, df_source_ports, df_destination_ports  # Declare global variables
+    global df_device_names, df_source_ports, df_destination_ports, df_source_flows  # Declare global variables
     filepath = filedialog.askopenfilename(
         filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
     )
@@ -37,6 +38,9 @@ def open_file():
         
         # Read Destination Ports sheet
         df_destination_ports = xl.parse('Destination Ports')
+        
+        # Read Source Flows sheet
+        df_source_flows = xl.parse('Source Flows')
         
         logging.info("Data loaded successfully.")
         
@@ -61,18 +65,39 @@ def display_data(dataframe):
         tree.insert("", "end", values=row)
     tree.pack(expand=True, fill=tk.BOTH)
 
-# Function to count flows for each GUID and Interface type in Source Ports
-def count_flows(guid, interface_type):
-    if df_source_ports is not None:
-        count = len(df_source_ports[(df_source_ports['GUID'] == guid) & (df_source_ports['Interface'] == interface_type)])
+# Function to count flows for each GUID, Interface type, and Spigot Index in Source Flows
+def count_flows(guid, interface_type, spigot_index):
+    if df_source_flows is not None:
+        count = len(df_source_flows[(df_source_flows['GUID'] == guid) &
+                                    (df_source_flows['Interface'] == interface_type) &
+                                    (df_source_flows['Spigot Index'] == spigot_index) &
+                                    (df_source_flows['Flow Enabled'] == True)])
         return count
     else:
         return 0
 
+# Function to create Flow_A and Flow_B elements for each flow
+def create_flow_elements(parent, guid, spigot_index):
+    if df_source_flows is not None:
+        flow_a_idx = 0
+        flow_b_idx = 0
+        for _, flow_row in df_source_flows[(df_source_flows['GUID'] == guid) &
+                                           (df_source_flows['Spigot Index'] == spigot_index) &
+                                           (df_source_flows['Flow Enabled'] == True)].iterrows():
+            interface = flow_row['Interface']
+            if interface == "A":
+                flow_element = ET.SubElement(parent, "Flow_A")
+                flow_element.set("idx", str(flow_a_idx))
+                flow_a_idx += 1
+            elif interface == "B":
+                flow_element = ET.SubElement(parent, "Flow_B")
+                flow_element.set("idx", str(flow_b_idx))
+                flow_b_idx += 1
+
 # Function to process data and create an XML file
 def process_and_create_xml():
-    global df_device_names, df_source_ports, df_destination_ports
-    if df_device_names is not None and df_source_ports is not None and df_destination_ports is not None:
+    global df_device_names, df_source_ports, df_destination_ports, df_source_flows
+    if df_device_names is not None and df_source_ports is not None and df_destination_ports is not None and df_source_flows is not None:
         try:
             logging.info("Creating XML file...")
             
@@ -88,6 +113,10 @@ def process_and_create_xml():
                 device.set("guid", str(guid))
                 device.set("typeName", str(device_name))
                 
+                # Initialize flow counts for destination spigots
+                numFlows_A_dst = 0
+                numFlows_B_dst = 0
+                
                 # Process Source Spigots for the current device
                 current_src_idx = 0
                 for s_index, src_row in df_source_ports[df_source_ports['GUID'] == guid].iterrows():
@@ -97,11 +126,20 @@ def process_and_create_xml():
                     src_spigot.set("format", "3G")
                     
                     # Count flows for Interface A and B
-                    numFlows_A = count_flows(guid, "A")
-                    numFlows_B = count_flows(guid, "B")
+                    spigot_index = current_src_idx + 1  # Convert zero-based index to one-based index
+                    numFlows_A = count_flows(guid, "A", spigot_index)
+                    numFlows_B = count_flows(guid, "B", spigot_index)
                     
                     src_spigot.set("numFlows_A", str(numFlows_A))
                     src_spigot.set("numFlows_B", str(numFlows_B))
+                    
+                    # Create flow elements for Interface A and B
+                    create_flow_elements(src_spigot, guid, spigot_index)
+                    
+                    # Set flow counts for destination spigots to match spigot idx="0"
+                    if current_src_idx == 0:
+                        numFlows_A_dst = numFlows_A
+                        numFlows_B_dst = numFlows_B
                     
                     current_src_idx += 1
                 
@@ -112,6 +150,11 @@ def process_and_create_xml():
                     dst_spigot.set("idx", str(current_dst_idx))
                     dst_spigot.set("mode", "dst")
                     dst_spigot.set("format", "3G")
+                    
+                    # Use the flow counts from the first source spigot
+                    dst_spigot.set("numFlows_A", str(numFlows_A_dst))
+                    dst_spigot.set("numFlows_B", str(numFlows_B_dst))
+                    
                     current_dst_idx += 1
             
             # Create a tree structure and write to an XML file

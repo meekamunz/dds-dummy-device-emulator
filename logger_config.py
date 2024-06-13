@@ -27,14 +27,17 @@ def configure_logging():
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
 
-    # Configure logging to file
+    # Configure logging to file with timestamped formatter
+    file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler('DummyDeviceBuilder.log')
     file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(file_formatter)
 
     # Configure logging to console with colored formatter
+    console_formatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.DEBUG)
-    console_handler.setFormatter(ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    console_handler.setFormatter(console_formatter)
 
     # Add handlers to the logger
     logger.addHandler(file_handler)
