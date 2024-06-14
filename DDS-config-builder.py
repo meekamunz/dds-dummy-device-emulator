@@ -15,6 +15,14 @@ extracted_data = []
 # Configure logging
 configure_logging()
 
+# Dictionary for Flow Type replacements
+flow_type_replacements = {
+    "ST 2110-20": "rfc_4175",
+    "ST 2110-30": "audio_pcm",
+    "ST 2110-40": "meta",
+    "ST 2022-6": "smpte2022_6"
+}
+
 def open_file():
     global df_device_names, df_source_ports, df_destination_ports, df_source_flows  # Declare global variables
     filepath = filedialog.askopenfilename(
@@ -81,17 +89,37 @@ def create_flow_elements(parent, guid, spigot_index):
     if df_source_flows is not None:
         flow_a_idx = 0
         flow_b_idx = 0
+        caps_counts_a = {}  # Dictionary to count caps occurrences for Flow_A
+        caps_counts_b = {}  # Dictionary to count caps occurrences for Flow_B
+
         for _, flow_row in df_source_flows[(df_source_flows['GUID'] == guid) &
                                            (df_source_flows['Spigot Index'] == spigot_index) &
                                            (df_source_flows['Flow Enabled'] == True)].iterrows():
             interface = flow_row['Interface']
+            flow_type = flow_row['Flow Type']
+            flow_type = flow_type_replacements.get(flow_type, flow_type)  # Replace flow type if applicable
+
             if interface == "A":
+                if flow_type in caps_counts_a:
+                    caps_counts_a[flow_type] += 1
+                else:
+                    caps_counts_a[flow_type] = 1
+                
                 flow_element = ET.SubElement(parent, "Flow_A")
                 flow_element.set("idx", str(flow_a_idx))
+                caps_element = ET.SubElement(flow_element, "Caps")
+                caps_element.set(flow_type, str(caps_counts_a[flow_type]))
                 flow_a_idx += 1
             elif interface == "B":
+                if flow_type in caps_counts_b:
+                    caps_counts_b[flow_type] += 1
+                else:
+                    caps_counts_b[flow_type] = 1
+                
                 flow_element = ET.SubElement(parent, "Flow_B")
                 flow_element.set("idx", str(flow_b_idx))
+                caps_element = ET.SubElement(flow_element, "Caps")
+                caps_element.set(flow_type, str(caps_counts_b[flow_type]))
                 flow_b_idx += 1
 
 # Function to process data and create an XML file
@@ -118,15 +146,18 @@ def process_and_create_xml():
                 numFlows_B_dst = 0
                 
                 # Process Source Spigots for the current device
-                current_src_idx = 0
+                current_spigot_idx = 0  # Initialize spigot index for the device
+                caps_counts_a = {}  # Dictionary to count caps occurrences for Flow_A
+                caps_counts_b = {}  # Dictionary to count caps occurrences for Flow_B
+                
                 for s_index, src_row in df_source_ports[df_source_ports['GUID'] == guid].iterrows():
                     src_spigot = ET.SubElement(device, "Spigot")
-                    src_spigot.set("idx", str(current_src_idx))
+                    src_spigot.set("idx", str(current_spigot_idx))
                     src_spigot.set("mode", "src")
                     src_spigot.set("format", "3G")
                     
                     # Count flows for Interface A and B
-                    spigot_index = current_src_idx + 1  # Convert zero-based index to one-based index
+                    spigot_index = current_spigot_idx + 1  # Convert zero-based index to one-based index
                     numFlows_A = count_flows(guid, "A", spigot_index)
                     numFlows_B = count_flows(guid, "B", spigot_index)
                     
@@ -137,17 +168,39 @@ def process_and_create_xml():
                     create_flow_elements(src_spigot, guid, spigot_index)
                     
                     # Set flow counts for destination spigots to match spigot idx="0"
-                    if current_src_idx == 0:
+                    if current_spigot_idx == 0:
                         numFlows_A_dst = numFlows_A
                         numFlows_B_dst = numFlows_B
                     
-                    current_src_idx += 1
+                    # Capture caps data for Flow_A and Flow_B
+                    caps_counts_a[current_spigot_idx] = caps_counts_a.get(current_spigot_idx, {})
+                    caps_counts_b[current_spigot_idx] = caps_counts_b.get(current_spigot_idx, {})
+                    
+                    for _, flow_row in df_source_flows[(df_source_flows['GUID'] == guid) &
+                                                       (df_source_flows['Spigot Index'] == spigot_index) &
+                                                       (df_source_flows['Flow Enabled'] == True)].iterrows():
+                        interface = flow_row['Interface']
+                        flow_type = flow_row['Flow Type']
+                        flow_type = flow_type_replacements.get(flow_type, flow_type)  # Replace flow type if applicable
+                        
+                        if interface == "A":
+                            if flow_type in caps_counts_a[current_spigot_idx]:
+                                caps_counts_a[current_spigot_idx][flow_type] += 1
+                            else:
+                                caps_counts_a[current_spigot_idx][flow_type] = 1
+                        elif interface == "B":
+                            if flow_type in caps_counts_b[current_spigot_idx]:
+                                caps_counts_b[current_spigot_idx][flow_type] += 1
+                            else:
+                                caps_counts_b[current_spigot_idx][flow_type] = 1
+                    
+                    current_spigot_idx += 1
                 
                 # Process Destination Spigots for the current device
-                current_dst_idx = 0  # Reset index for destination spigots
+                current_spigot_idx = 0  # Reset spigot index for destination spigots
                 for d_index, dst_row in df_destination_ports[df_destination_ports['GUID'] == guid].iterrows():
                     dst_spigot = ET.SubElement(device, "Spigot")
-                    dst_spigot.set("idx", str(current_dst_idx))
+                    dst_spigot.set("idx", str(current_spigot_idx + 8))  # Destination spigot index starts from 8
                     dst_spigot.set("mode", "dst")
                     dst_spigot.set("format", "3G")
                     
@@ -155,7 +208,22 @@ def process_and_create_xml():
                     dst_spigot.set("numFlows_A", str(numFlows_A_dst))
                     dst_spigot.set("numFlows_B", str(numFlows_B_dst))
                     
-                    current_dst_idx += 1
+                    # Copy caps data from corresponding source spigot
+                    src_spigot_index = current_spigot_idx % len(df_source_ports)  # Calculate source spigot index
+                    caps_a_data = caps_counts_a[src_spigot_index]
+                    caps_b_data = caps_counts_b[src_spigot_index]
+                    
+                    if "Flow_A" in caps_a_data:
+                        for flow_type, count in caps_a_data.items():
+                            caps_element = ET.SubElement(dst_spigot, "Caps")
+                            caps_element.set(flow_type, str(count))
+                    
+                    if "Flow_B" in caps_b_data:
+                        for flow_type, count in caps_b_data.items():
+                            caps_element = ET.SubElement(dst_spigot, "Caps")
+                            caps_element.set(flow_type, str(count))
+                    
+                    current_spigot_idx += 1
             
             # Create a tree structure and write to an XML file
             tree = ET.ElementTree(root)
@@ -170,6 +238,7 @@ def process_and_create_xml():
     else:
         logging.warning("No data loaded.")
         messagebox.showwarning("Warning", "No data loaded. Please open an Excel file first.")
+
 
 # Create the main application window
 root = tk.Tk()
