@@ -23,7 +23,7 @@ configure_logging()
 flow_type_replacements = {
     "ST 2110-20": "rfc_4175",
     "ST 2110-30": "audio_pcm",
-    "ST 2110-40": "meta",
+    "ST 2110-40": "metadata",
     "ST 2022-6": "smpte2022_6"
 }
 
@@ -108,18 +108,18 @@ def count_flows(guid, interface_type, spigot_index):
         return 0
 
 # Function to create Flow_A and Flow_B elements for each flow
+# Function to create Flow_A and Flow_B elements for each flow
 def create_flow_elements(parent, guid, spigot_index, is_source_spigot):
     global flow_a_index, flow_b_index
-    global df_first_spigot_flows_a, df_first_spigot_flows_b  # Declare global variables
+    
+    # Initialize counters for Flow_A and Flow_B
+    flow_a_index = 0
+    flow_b_index = 0
     
     caps_counts_a = {}  # Dictionary to count caps occurrences for Flow_A
     caps_counts_b = {}  # Dictionary to count caps occurrences for Flow_B
 
     if df_source_flows is not None:
-        # Reset indices for each spigot
-        flow_a_index = 0
-        flow_b_index = 0
-        
         for _, flow_row in df_source_flows[(df_source_flows['GUID'] == guid) &
                                            (df_source_flows['Spigot Index'] == spigot_index) &
                                            (df_source_flows['Flow Enabled'] == True)].iterrows():
@@ -189,6 +189,14 @@ def create_flow_elements(parent, guid, spigot_index, is_source_spigot):
         if is_source_spigot and spigot_index == 1:
             df_first_spigot_flows_a = [{"idx": idx, "type": key, "count": value} for idx, (key, value) in enumerate(caps_counts_a.items())]
             df_first_spigot_flows_b = [{"idx": idx, "type": key, "count": value} for idx, (key, value) in enumerate(caps_counts_b.items())]
+
+    # Calculate numFlows_A and numFlows_B for destination spigots
+    if not is_source_spigot:
+        num_flows_a = 3  # Assuming 3 Flow_A elements per destination spigot
+        num_flows_b = 3  # Assuming 3 Flow_B elements per destination spigot
+        
+        parent.set("numFlows_A", str(num_flows_a))
+        parent.set("numFlows_B", str(num_flows_b))
 
 def process_and_create_xml(filepath):
     global df_device_names, df_source_ports, df_destination_ports, df_source_flows
@@ -285,6 +293,10 @@ def process_and_create_xml(filepath):
                     dst_spigot.set("numFlows_A", str(numFlows_A))
                     dst_spigot.set("numFlows_B", str(numFlows_B))
                     
+                    if numFlows_A == 0 and numFlows_B == 0:
+                        # No source spigots found, add default Flow_A and Flow_B elements
+                        add_default_flows(dst_spigot)
+                    
                     # Copy all Flow_A and Flow_B instances from the first source spigot to the destination spigot
                     copy_caps_to_destination_spigots(dst_spigot, first_spigot_flows_a, first_spigot_flows_b)
                     
@@ -301,6 +313,23 @@ def process_and_create_xml(filepath):
         
         except Exception as e:
             logging.error(f"Error creating XML file: {e}")
+
+def add_default_flows(dst_spigot):
+    # Add default Flow_A elements
+    flow_a_types = ["rfc_4175", "audio_pcm", "metadata"]
+    for idx, flow_type in enumerate(flow_a_types):
+        flow_a = ET.SubElement(dst_spigot, "Flow_A")
+        flow_a.set("idx", str(idx))
+        caps_element_a = ET.SubElement(flow_a, "Caps")
+        caps_element_a.set(flow_type, "1")
+    
+    # Add default Flow_B elements
+    flow_b_types = ["rfc_4175", "audio_pcm", "metadata"]
+    for idx, flow_type in enumerate(flow_b_types):
+        flow_b = ET.SubElement(dst_spigot, "Flow_B")
+        flow_b.set("idx", str(idx))
+        caps_element_b = ET.SubElement(flow_b, "Caps")
+        caps_element_b.set(flow_type, "1")
 
 # Function to copy Caps to destination spigots for all flow types
 def copy_caps_to_destination_spigots(dst_spigot, flows_a, flows_b):
