@@ -1,6 +1,6 @@
 import pandas as pd
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk, Scrollbar
+from tkinter import filedialog, messagebox, ttk
 import xml.etree.ElementTree as ET
 import logging
 from logger_config import configure_logging  # Import configure_logging function
@@ -12,7 +12,6 @@ df_device_names = None
 df_source_ports = None
 df_destination_ports = None
 df_source_flows = None
-extracted_data = []
 flow_a_index = 0
 flow_b_index = 0
 
@@ -26,14 +25,6 @@ flow_type_replacements = {
     "ST 2110-40": "metadata",
     "ST 2022-6": "smpte2022_6"
 }
-
-# Function to count the number of flows for a given GUID, interface, and spigot index
-def count_flows(guid, interface, spigot_index):
-    global df_source_flows
-    return len(df_source_flows[(df_source_flows['GUID'] == guid) & 
-                               (df_source_flows['Interface'] == interface) & 
-                               (df_source_flows['Spigot Index'] == spigot_index) &
-                               (df_source_flows['Flow Enabled'] == True)])
 
 def open_file():
     global df_device_names, df_source_ports, df_destination_ports, df_source_flows, create_xml_button  # Declare global variables
@@ -76,11 +67,6 @@ def open_file():
         messagebox.showerror("Error", f"Failed to read file\n{str(e)}")
         # Disable create_xml_button if data loading fails
         create_xml_button.config(state=tk.DISABLED)
-
-        
-    except Exception as e:
-        logging.error(f"Failed to read file: {str(e)}")
-        messagebox.showerror("Error", f"Failed to read file\n{str(e)}")
 
 def display_data(dataframe):
     # Clear previous content in the treeview
