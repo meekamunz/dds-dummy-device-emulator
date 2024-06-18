@@ -1,6 +1,6 @@
 import pandas as pd
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, Scrollbar
 import xml.etree.ElementTree as ET
 import logging
 from logger_config import configure_logging  # Import configure_logging function
@@ -36,7 +36,7 @@ def count_flows(guid, interface, spigot_index):
                                (df_source_flows['Flow Enabled'] == True)])
 
 def open_file():
-    global df_device_names, df_source_ports, df_destination_ports, df_source_flows  # Declare global variables
+    global df_device_names, df_source_ports, df_destination_ports, df_source_flows, create_xml_button  # Declare global variables
     filepath = filedialog.askopenfilename(
         filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
     )
@@ -67,6 +67,16 @@ def open_file():
         df_source_flows = df_source_flows[df_source_flows['Device Type'] == 'GVOP']
         
         logging.info("Data loaded successfully.")
+        
+        # Enable create_xml_button after data is loaded
+        create_xml_button.config(state=tk.NORMAL)
+        
+    except Exception as e:
+        logging.error(f"Failed to read file: {str(e)}")
+        messagebox.showerror("Error", f"Failed to read file\n{str(e)}")
+        # Disable create_xml_button if data loading fails
+        create_xml_button.config(state=tk.DISABLED)
+
         
     except Exception as e:
         logging.error(f"Failed to read file: {str(e)}")
@@ -352,21 +362,90 @@ def create_xml_process():
 root = tk.Tk()
 root.title("Create DDS Dummy Devices file")
 
+## Create a frame for the treeview
+data_frame = tk.Frame(root)
+data_frame.pack(expand=True, fill=tk.BOTH)
+
+# Create a treeview widget to display the dataframe
+tree = ttk.Treeview(data_frame)
+tree.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)  # Adjust packing
+
+# Create a vertical scrollbar for the tree widget
+tree_scrollbar = ttk.Scrollbar(data_frame, orient=tk.VERTICAL, command=tree.yview)
+tree_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)  # Adjust packing
+tree.config(yscrollcommand=tree_scrollbar.set)
+
+# Create a frame for the log text and buttons
+log_frame = tk.Frame(root)
+log_frame.pack(expand=True, fill=tk.BOTH)
+
+# Create a text widget to display the tail of the logfile
+log_text = tk.Text(log_frame, height=10, wrap=tk.WORD)
+log_text.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
+
+# Create a vertical scrollbar for the log text widget
+log_scrollbar = tk.Scrollbar(log_frame, orient=tk.VERTICAL, command=log_text.yview)
+log_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+log_text.config(yscrollcommand=log_scrollbar.set)
+
+# Function to update the log text widget with the tail of the logfile
+def update_log_text():
+    global log_text
+    try:
+        # Get current vertical scrollbar position
+        scrollbar_pos = log_text.yview()[1]
+        
+        # Open the log file
+        with open('DummyDeviceBuilder.log', 'r') as log_file:
+            # Read the last 20 lines (you can adjust the number of lines as needed)
+            log_lines = log_file.readlines()[-20:]
+            # Clear previous content in the text widget
+            log_text.delete('1.0', tk.END)
+            # Display the log lines, with color inversion
+            for line in log_lines:
+                if "ERROR" in line:
+                    log_text.insert(tk.END, line, 'error')
+                elif "WARNING" in line:
+                    log_text.insert(tk.END, line, 'warning')
+                else:
+                    log_text.insert(tk.END, line)
+            
+            # Configure tag colors with inversion
+            log_text.tag_config('error', foreground='white', background='red')
+            log_text.tag_config('warning', foreground='white', background='orange')
+            log_text.tag_config('info', foreground='black', background='light grey')  # Adjust as needed
+        
+        # Scroll to the bottom only if the scrollbar was already at the bottom
+        if scrollbar_pos == 1.0:
+            log_text.see(tk.END)  # Scroll to the bottom if scrollbar was at the bottom
+        
+    except FileNotFoundError:
+        # Handle case where the log file doesn't exist yet
+        pass
+    except Exception as e:
+        # Display error message if unable to read log file
+        log_text.insert(tk.END, f"Error reading log file: {str(e)}", 'error')
+    
+    # Schedule the update_log_text function to be called again after 1000 milliseconds (1 second)
+    log_text.after(1000, update_log_text)
+
+# Call the function initially to populate the log text widget
+update_log_text()
+
+# Initial configuration for log_text
+log_text.configure(bg='black', fg='white')  # Set background to black and text to white
+
 # Create a frame for the buttons
-frame = tk.Frame(root)
-frame.pack(pady=10)
+button_frame = tk.Frame(root)
+button_frame.pack(pady=10)
 
 # Create a button to open the file dialog
-open_button = tk.Button(frame, text="Open IP Configurator Export file", command=open_file)
+open_button = tk.Button(button_frame, text="Open IP Configurator Export file", command=open_file)
 open_button.pack(side=tk.LEFT, padx=10)
 
 # Create a button to create the XML file
-create_xml_button = tk.Button(frame, text="Create Dummy DDS file", command=create_xml_process)
+create_xml_button = tk.Button(button_frame, text="Create Dummy DDS file", command=create_xml_process)
 create_xml_button.pack(side=tk.LEFT, padx=10)
-
-# Create a treeview widget to display the dataframe
-tree = ttk.Treeview(root)
-tree.pack(expand=True, fill=tk.BOTH)
 
 # Start the main event loop
 root.mainloop()

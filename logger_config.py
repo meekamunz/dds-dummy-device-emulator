@@ -1,4 +1,5 @@
 import logging
+import os
 
 # Define custom colors using ANSI escape codes
 COLORS = {
@@ -27,9 +28,14 @@ def configure_logging():
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
 
+    # Clear log file content if it exists
+    log_filename = 'DummyDeviceBuilder.log'
+    if os.path.exists(log_filename):
+        open(log_filename, 'w').close()
+
     # Configure logging to file with timestamped formatter
     file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler('DummyDeviceBuilder.log')
+    file_handler = logging.FileHandler(log_filename)
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(file_formatter)
 

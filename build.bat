@@ -1,13 +1,13 @@
-:START
 @echo off
 
-:CLEANBUILD
+REM Clean build directories
 rmdir /s /q __pycache__
 rmdir /s /q build
 rmdir /s /q dist
 del *.spec
 
-:PYTHONCOMPILE
-pyinstaller --onefile --icon=icon.ico DDS-config-builder.py -n "DDS Dummy Device Creator"
+REM Compile using PyInstaller
+pyinstaller --onefile --noconsole --icon=icon.ico DDS-config-builder.py --name "DDS Dummy Device Creator"
 
-REM copy .\dist\*.exe "C:\Users\MichaelMunns\OneDrive - GrassValley\Product Downloads\Toolkit\IPRA"
+REM Pause to see the output
+pause
