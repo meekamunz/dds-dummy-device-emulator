@@ -108,7 +108,6 @@ def count_flows(guid, interface_type, spigot_index):
         return 0
 
 # Function to create Flow_A and Flow_B elements for each flow
-# Function to create Flow_A and Flow_B elements for each flow
 def create_flow_elements(parent, guid, spigot_index, is_source_spigot):
     global flow_a_index, flow_b_index
     
