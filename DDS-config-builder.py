@@ -12,8 +12,6 @@ df_device_names = None
 df_source_ports = None
 df_destination_ports = None
 df_source_flows = None
-df_first_spigot_flows_a = []  # Initialize as empty list
-df_first_spigot_flows_b = []  # Initialize as empty list
 extracted_data = []
 flow_a_index = 0
 flow_b_index = 0
@@ -182,10 +180,8 @@ def create_flow_elements(parent, guid, spigot_index, is_source_spigot):
             df_first_spigot_flows_a = [{"idx": idx, "type": key, "count": value} for idx, (key, value) in enumerate(caps_counts_a.items())]
             df_first_spigot_flows_b = [{"idx": idx, "type": key, "count": value} for idx, (key, value) in enumerate(caps_counts_b.items())]
 
-# Function to process data and create an XML file
 def process_and_create_xml(filepath):
     global df_device_names, df_source_ports, df_destination_ports, df_source_flows
-    global df_first_spigot_flows_a, df_first_spigot_flows_b
     
     if df_device_names is not None and df_source_ports is not None and df_destination_ports is not None and df_source_flows is not None:
         try:
@@ -222,9 +218,6 @@ def process_and_create_xml(filepath):
                 device.set("linkSpeedA", "25000")  # Set linkSpeedA to "25000"
                 device.set("linkSpeedB", "25000")  # Set linkSpeedB to "25000"
                 
-                device_first_spigot_caps_a = {}
-                device_first_spigot_caps_b = {}
-
                 current_spigot_idx = 0  # Initialize spigot index for the device
                 
                 # Count number of source spigots
@@ -252,11 +245,8 @@ def process_and_create_xml(filepath):
                     src_spigot.set("numFlows_A", str(numFlows_A))
                     src_spigot.set("numFlows_B", str(numFlows_B))
                     
+                    # Create Flow_A and Flow_B elements for the current source spigot
                     create_flow_elements(src_spigot, guid, spigot_index + 1, is_source_spigot=True)
-                    
-                    if spigot_index == 0:
-                        device_first_spigot_caps_a = df_first_spigot_flows_a.copy()
-                        device_first_spigot_caps_b = df_first_spigot_flows_b.copy()
                 
                 # Process Destination Spigots for the current device
                 for d_index, dst_row in df_destination_ports[df_destination_ports['GUID'] == guid].iterrows():
@@ -265,14 +255,30 @@ def process_and_create_xml(filepath):
                     # Adjusted spigot index from Destination Ports worksheet
                     dst_spigot_idx = int(dst_row['Spigot Index']) - 1  # Convert 1-based to 0-based index
                     dst_spigot.set("idx", str(dst_spigot_idx))
-                    dst_spigot.set("mode", "dest")
+                    dst_spigot.set("mode", "dst")
                     dst_spigot.set("format", "3G")
                     
-                    dst_spigot.set("numFlows_A", "0")
-                    dst_spigot.set("numFlows_B", "0")
+                    # Retrieve all Flow_A and Flow_B instances from the first source spigot dynamically
+                    first_spigot_flows_a = df_source_flows[(df_source_flows['GUID'] == guid) & 
+                                                           (df_source_flows['Spigot Index'] == 1) & 
+                                                           (df_source_flows['Interface'] == 'A') & 
+                                                           (df_source_flows['Flow Enabled'] == True)]
                     
-                    copy_caps_to_destination_spigots(dst_spigot, device_first_spigot_caps_a, device_first_spigot_caps_b)
+                    first_spigot_flows_b = df_source_flows[(df_source_flows['GUID'] == guid) & 
+                                                           (df_source_flows['Spigot Index'] == 1) & 
+                                                           (df_source_flows['Interface'] == 'B') & 
+                                                           (df_source_flows['Flow Enabled'] == True)]
                     
+                    numFlows_A = len(first_spigot_flows_a)
+                    numFlows_B = len(first_spigot_flows_b)
+                    
+                    dst_spigot.set("numFlows_A", str(numFlows_A))
+                    dst_spigot.set("numFlows_B", str(numFlows_B))
+                    
+                    # Copy all Flow_A and Flow_B instances from the first source spigot to the destination spigot
+                    copy_caps_to_destination_spigots(dst_spigot, first_spigot_flows_a, first_spigot_flows_b)
+                    
+                    # Create Flow_A and Flow_B elements for the current destination spigot
                     create_flow_elements(dst_spigot, guid, dst_spigot_idx + 1, is_source_spigot=False)
                 
                 devices.append(ET.tostring(device, encoding='unicode'))
@@ -287,30 +293,36 @@ def process_and_create_xml(filepath):
             logging.error(f"Error creating XML file: {e}")
 
 # Function to copy Caps to destination spigots for all flow types
-def copy_caps_to_destination_spigots(dst_spigot, first_spigot_caps_a, first_spigot_caps_b):
-    flow_types_a = set(caps["type"] for caps in first_spigot_caps_a)
-    flow_types_b = set(caps["type"] for caps in first_spigot_caps_b)
+def copy_caps_to_destination_spigots(dst_spigot, flows_a, flows_b):
+    global flow_type_replacements
     
-    all_flow_types = flow_types_a.union(flow_types_b)
-    
-    for flow_type in all_flow_types:
-        # Copy Flow_A caps for the current flow type
-        if flow_type in flow_types_a:
-            flow_elements_a = [caps for caps in first_spigot_caps_a if caps["type"] == flow_type]
-            for caps_a in flow_elements_a:
-                flow_a = ET.SubElement(dst_spigot, "Flow_A")
-                flow_a.set("idx", str(caps_a["idx"]))
-                caps_element_a = ET.SubElement(flow_a, "Caps")
-                caps_element_a.set(flow_type, str(caps_a["count"]))
+    # Reset counters for Flow_A and Flow_B
+    flow_a_index = 0
+    flow_b_index = 0
+
+    # Iterate over all Flow_A from the first source spigot and copy to destination spigot
+    for _, row in flows_a.iterrows():
+        flow_type = row['Flow Type']
+        flow_type = flow_type_replacements.get(flow_type, flow_type)  # Replace flow type if applicable
         
-        # Copy Flow_B caps for the current flow type
-        if flow_type in flow_types_b:
-            flow_elements_b = [caps for caps in first_spigot_caps_b if caps["type"] == flow_type]
-            for caps_b in flow_elements_b:
-                flow_b = ET.SubElement(dst_spigot, "Flow_B")
-                flow_b.set("idx", str(caps_b["idx"]))
-                caps_element_b = ET.SubElement(flow_b, "Caps")
-                caps_element_b.set(flow_type, str(caps_b["count"]))
+        flow_a = ET.SubElement(dst_spigot, "Flow_A")
+        flow_a.set("idx", str(flow_a_index))  # Reset idx per spigot
+        caps_element_a = ET.SubElement(flow_a, "Caps")
+        caps_element_a.set(flow_type, "1")  # Assuming count of 1 for each cap type
+
+        flow_a_index += 1
+    
+    # Iterate over all Flow_B from the first source spigot and copy to destination spigot
+    for _, row in flows_b.iterrows():
+        flow_type = row['Flow Type']
+        flow_type = flow_type_replacements.get(flow_type, flow_type)  # Replace flow type if applicable
+        
+        flow_b = ET.SubElement(dst_spigot, "Flow_B")
+        flow_b.set("idx", str(flow_b_index))  # Reset idx per spigot
+        caps_element_b = ET.SubElement(flow_b, "Caps")
+        caps_element_b.set(flow_type, "1")  # Assuming count of 1 for each cap type
+
+        flow_b_index += 1
 
 # Function to handle XML creation process after data is loaded
 def create_xml_process():
