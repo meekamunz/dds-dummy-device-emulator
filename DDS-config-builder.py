@@ -14,6 +14,7 @@ df_destination_ports = None
 df_source_flows = None
 flow_a_index = 0
 flow_b_index = 0
+processing_window = None
 
 # Configure logging
 configure_logging()
@@ -26,6 +27,10 @@ flow_type_replacements = {
     "ST 2022-6": "smpte2022_6"
 }
 
+def replace_nan_with_empty_string(df):
+    # Replace nan values with empty strings in the DataFrame
+    return df.fillna('')
+
 def open_file():
     global df_device_names, df_source_ports, df_destination_ports, df_source_flows, create_xml_button  # Declare global variables
     filepath = filedialog.askopenfilename(
@@ -35,6 +40,9 @@ def open_file():
         return
     
     try:
+        show_processing_window("Opening and processing file...")  # Show processing window
+        root.update()  # Update the root window to display the processing window
+
         logging.info(f"Opening file: {filepath}")
         
         # Read the entire workbook
@@ -43,20 +51,24 @@ def open_file():
         # Read and filter Device Names sheet
         df_device_names = xl.parse('Device Names')
         df_device_names = df_device_names[df_device_names['Device Type'] == 'GVOP']
+        df_device_names = replace_nan_with_empty_string(df_device_names)  # Replace nan values
         display_data(df_device_names)
         
         # Read and filter Source Ports sheet
         df_source_ports = xl.parse('Source Ports')
         df_source_ports = df_source_ports[df_source_ports['Device Type'] == 'GVOP']
+        # df_source_ports = replace_nan_with_empty_string(df_source_ports)  # Replace nan values
         
         # Read and filter Destination Ports sheet
         df_destination_ports = xl.parse('Destination Ports')
         df_destination_ports = df_destination_ports[df_destination_ports['Device Type'] == 'GVOP']
+        # df_destination_ports = replace_nan_with_empty_string(df_destination_ports)  # Replace nan values
         
         # Read and filter Source Flows sheet
         df_source_flows = xl.parse('Source Flows')
         df_source_flows = df_source_flows[df_source_flows['Device Type'] == 'GVOP']
-        
+        # df_source_flows = replace_nan_with_empty_string(df_source_flows)  # Replace nan values
+
         logging.info("Data loaded successfully.")
         
         # Enable create_xml_button after data is loaded
@@ -67,6 +79,8 @@ def open_file():
         messagebox.showerror("Error", f"Failed to read file\n{str(e)}")
         # Disable create_xml_button if data loading fails
         create_xml_button.config(state=tk.DISABLED)
+    finally:
+        hide_processing_window()  # Hide processing window
 
 def display_data(dataframe):
     # Clear previous content in the treeview
@@ -367,13 +381,18 @@ def create_xml_process():
             )
             if not filepath:
                 return  # User canceled
-            
+
+            show_processing_window("Creating XML file...")  # Show processing window
+            root.update()  # Update the root window to display the processing window
+
             # Process and create XML file
             process_and_create_xml(filepath)
         
         except Exception as e:
             logging.error(f"Failed to create XML file: {str(e)}")
             messagebox.showerror("Error", f"Failed to create XML file:\n{str(e)}")
+        finally:
+            hide_processing_window()  # Hide processing window
     
     else:
         logging.warning("No data loaded.")
@@ -407,6 +426,21 @@ log_text.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
 log_scrollbar = tk.Scrollbar(log_frame, orient=tk.VERTICAL, command=log_text.yview)
 log_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 log_text.config(yscrollcommand=log_scrollbar.set)
+
+def show_processing_window(message="Processing..."):
+    global processing_window
+    processing_window = tk.Toplevel(root)
+    processing_window.title("Please Wait")
+    processing_window.geometry("300x100")
+    processing_window.resizable(False, False)
+    tk.Label(processing_window, text=message).pack(pady=20)
+    processing_window.grab_set()  # Make the processing window modal
+
+def hide_processing_window():
+    global processing_window
+    if processing_window:
+        processing_window.destroy()
+
 
 # Function to update the log text widget with the tail of the logfile
 def update_log_text():
