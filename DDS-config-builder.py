@@ -116,7 +116,13 @@ def create_flow_elements(parent, guid, spigot_index, is_source_spigot):
             mcast_address = flow_row['Multicast Address']
             src_address = flow_row['Source Address']
             dst_port = int(flow_row['Dst RTP Port'])  # Convert to integer
-            src_port = int(flow_row['Src RTP Port'])  # Convert to integer
+
+            # Attempt to use "Src RTP Port", fall back to "Dst RTP Port" if not available
+            try:
+                src_port = int(flow_row['Src RTP Port']) if pd.notnull(flow_row['Src RTP Port']) else dst_port
+            except KeyError:
+                src_port = dst_port  # Fallback in case the column doesn't exist
+
             params_type = flow_type
 
             if params_type == "meta":
